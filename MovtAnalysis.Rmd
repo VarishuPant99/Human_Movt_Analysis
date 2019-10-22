@@ -1,0 +1,162 @@
+---
+output: 
+  html_document: 
+    keep_md: yes
+---
+# Human movement Analysis using activity monitoring devices
+### *By Varishu Pant*
+### *30-06-2018*
+### *Updated on 22-10-2019*
+
+## Synopsis
+
+It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a Fitbit, Nike Fuelband, or Jawbone Up. These type of devices are part of the “quantified self” movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. But these data remain under-utilized both because the raw data are hard to obtain and there is a lack of statistical methods and software for processing and interpreting the data.
+
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+This Project attempts to answer the following questions-
+
+1.What is the average daily activity pattern?  
+2.Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?  
+3.Are there differences in activity patterns between weekdays and weekends?
+
+
+```{r load_packages,include=FALSE}
+## Loading Required Packages
+
+library(knitr)
+library(dplyr)
+library(ggplot2)
+library(VIM)
+```
+
+### Setting Working Directory
+
+```{r set_wd,results='hide'}
+setwd("C:/Users/Varishu Pant/Desktop/Praxis docs/R")
+```
+
+### Reading Data
+
+```{r read_data,results='hide'}
+Data<-read.csv("activity.csv",header = TRUE)
+```
+
+## Exploring Data
+
+```{r}
+str(Data)
+summary(Data)
+```
+
+### Imputing Missing Values
+
+Due to the sequential nature of the data,I use k nearest neighbours to impute missing values for steps variable.
+```{r}
+Data<-kNN(data = Data,variable = 'steps',k=5)
+summary(Data)
+
+```
+
+#### Boxplot of interval Variable
+
+```{r}
+ggplot(data=Data,aes(y=interval))+geom_boxplot(fill='lightcoral',col='darkblue')+
+labs(title='5 minute intervals')+
+theme(plot.background = element_rect(fill='cadetblue'),panel.background=element_rect(fill='lemonchiffon2'))+
+theme(plot.title = element_text(hjust = 0.5,face = 'bold',colour = 'white'),axis.text= element_text(size=12,colour='white'))+
+theme(axis.line = element_line(colour = 'darkblue', size = 1.5, linetype = "solid"))+
+theme(axis.title = element_text(colour = "white"))
+
+```
+
+The data has activity for 61 days and for each of those days,data has been collected every 5 minute interval.
+If variable says 835,it refers to activity during 8:35-8:40 am.Maximum is 2355 referring to activity during 23:55 and 00:00.Similarly minimum is 0 referring to activity during 00:00 and 00:05.
+
+
+### Finding mean total number of steps taken per day
+
+After I group the data by date,and summarise it to make a new dataset,I add appropriate column names to the new data set and plot a histogram of total steps taken per day.
+
+```{r}
+grouped_data<-group_by(Data,date)
+newData<-summarise(grouped_data,sum(steps))
+names(newData)<-c("Days","Steps_Taken")
+ggplot(data = newData,aes(x=Steps_Taken))+geom_histogram(bins=9,fill='lightcoral',col='darkblue')+
+labs(title='Total Steps Per Day',x="Total Steps Taken",y='Frequency')+
+theme(plot.background = element_rect(fill='cadetblue'),panel.background=element_rect(fill='lemonchiffon2'))+
+theme(plot.title = element_text(hjust = 0.5,face = 'bold',colour = 'white'),axis.text= element_text(size=12,colour='white'))+
+theme(axis.line = element_line(colour = 'darkblue', size = 1.5, linetype = "solid"))+
+theme(axis.title = element_text(colour = "white"))
+```
+
+We see that on an average ,approximately 10000 steps are taken by per day.Now let's check if our estimation is correct by comparing it to the actual mean.
+
+```{r mean,median}
+Mean<-mean(newData$Steps_Taken)
+Median<-median(newData$Steps_Taken)
+paste("Mean of Total Number of Steps Taken Per Day is equal to" ,Mean)
+paste("Median of Total Number of Steps Taken Per Day is equal to",Median)
+```
+
+### Finding Average Daily Activity Pattern
+
+
+I group Data by interval,and summarise it to make a new dataset.Then I make a time series plot of average number of steps taken per interval.
+
+```{r}
+grouped_data2<-group_by(Data,interval)
+newData2<-summarise(grouped_data2,Average_Steps=mean(steps))
+ggplot(data = newData2,aes(x=interval,y=Average_Steps))+geom_point(col='darkblue')+geom_line(col='aquamarine4')+geom_smooth(col='lightcoral',method = )+
+labs(title='Average Steps Per Interval',x='5 minute intervals throughout the day',y='Average Steps')+
+theme(plot.background = element_rect(fill='cadetblue'),panel.background=element_rect(fill='lemonchiffon2'))+
+theme(plot.title = element_text(hjust = 0.5,face = 'bold',colour = 'white'),axis.text= element_text(size=12,colour='white'))+
+theme(axis.line = element_line(colour = 'darkblue', size = 1.5, linetype = "solid"))+
+theme(axis.title = element_text(colour = "white"))
+```
+
+Observation-
+Huge spike in activity around 8-10am[rush hours] probably due to office timings.
+Throughout the day from 10am to 7pm average steps taken every minutes are around 50-100.
+During the night from 11 pm to 6 am,average steps fall to approximately 0 per interval.
+
+Now to find for which interval are the average steps maximum-
+
+```{r max_avg_steps}
+max<-which.max(newData2$Average_Steps)
+reqInterval<-newData2$interval[max]
+paste("The interval number",reqInterval,"on average across all the days in the dataset, contains the maximum number of steps.")
+```
+In other words,on an average,highest activity spotted during 8:35-8:40am.
+
+
+### Finding out if there are differences in activity patterns between weekdays and weekends
+
+I create a new factor variable in the dataset with two levels - "weekday" and "weekend" indicating whether a given date is a weekday or weekend day
+
+```{r}
+Data$date<-as.Date(Data$date)
+Data2<- mutate(Data, day = ifelse(weekdays(Data$date) == "Saturday" | weekdays(Data$date)=="Sunday","weekend","weekday"))
+
+grouped_data3<-group_by(Data2,day,interval)
+newData3<-summarise(grouped_data3,Average_Steps=mean(steps))
+
+```
+
+
+```{r}
+ggplot(data = newData3,aes(x=interval,y=Average_Steps))+geom_point(col='darkblue')+geom_line(col='aquamarine4')+geom_smooth(col='lightcoral')+facet_grid(~factor(day))+
+labs(title='Average Steps Per Interval',x='5 minute intervals throughout the day',y='Average Steps')+
+theme(plot.background = element_rect(fill='cadetblue'),panel.background=element_rect(fill='lemonchiffon2'))+
+theme(plot.title = element_text(hjust = 0.5,face = 'bold',colour = 'white'),axis.text= element_text(size=12,colour='white'))+
+theme(axis.line = element_line(colour = 'darkblue', size = 1.5, linetype = "solid"))+
+theme(axis.title = element_text(colour = "white"))
+
+```
+
+
+In general,on weekends,average number of steps per interval throughout the day remain approximately in the inclusive range (75,125).Also any significant activity starts later in the day around 7:30-8am unlike weekdays where it started from 6am.There's more variance in activity during the weekdays than in the weekends with the highest average steps per interval taken on weekdays.
+For weekdays,the trend line is right skewed showing large activity during first half of the day and low during the second half.For weekends,the trend line is left skewed showing more activity during second half of the day.
+Also people tend to go sleep late during weekends.This can be seen by the drop in activity to 0 at 9pm during weekdays and on the other hand,at 11pm during weekends.
+
+
